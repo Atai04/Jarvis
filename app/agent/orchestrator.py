@@ -37,10 +37,36 @@ IMPORTANT RULES:
 9. The security layer, not the language model, makes permission decisions.
 
 10. Keep responses concise and useful.
+
+TOOL SELECTION RULES:
+
+11. Use the most specific available tool for the user's request.
+
+12. If the user asks to read a specific local file and the read_file tool
+    is available, use read_file directly.
+
+13. Do not use terminal commands such as cat, find, grep, mdfind, or similar
+    commands as a substitute for read_file when read_file is available.
+
+14. If the user asks to list the contents of a directory and the
+    list_directory tool is available, use list_directory directly.
+
+15. If the user asks for information about the Mac itself and the
+    get_system_info tool is available, use get_system_info directly.
+
+16. Use the terminal tool when the user explicitly asks to execute a
+    terminal command, or when no more specific tool is available.
+
+17. Do not use a more powerful tool when a narrower tool can safely
+    accomplish the same task.
+
+18. For multi-step requests, complete each required step using the
+    appropriate tool before producing the final answer.
 """
 
 
 class AgentOrchestrator:
+
     def __init__(
         self,
         llm: LLMProvider,
@@ -67,13 +93,17 @@ class AgentOrchestrator:
         max_iterations = 10
 
         for _ in range(max_iterations):
+
             if not response.tool_calls:
                 return response.content
 
             results: list[tuple[str, str]] = []
 
             for tool_call in response.tool_calls:
-                result = await self._handle_tool_call(tool_call)
+
+                result = await self._handle_tool_call(
+                    tool_call
+                )
 
                 results.append(
                     (
@@ -88,27 +118,34 @@ class AgentOrchestrator:
                 tools=tool_schemas,
             )
 
-        return "JARVIS stopped because the maximum agent iteration limit was reached."
+        return (
+            "JARVIS stopped because the maximum "
+            "agent iteration limit was reached."
+        )
 
     async def _handle_tool_call(
         self,
         tool_call: Any,
     ) -> str:
 
-        tool = self.tools.get(tool_call.name)
+        tool = self.tools.get(
+            tool_call.name
+        )
 
         if tool is None:
             return f"Unknown tool: {tool_call.name}"
 
         try:
-            arguments = json.loads(tool_call.arguments)
+            arguments = json.loads(
+                tool_call.arguments
+            )
 
         except json.JSONDecodeError as exc:
             return f"Invalid tool arguments: {exc}"
 
-        # Dynamic permission is calculated from
-        # the actual tool arguments.
-        permission_level = tool.get_permission(arguments)
+        permission_level = tool.get_permission(
+            arguments
+        )
 
         if permission_level.value == "safe":
             decision = PermissionDecision.ALLOW
@@ -119,18 +156,14 @@ class AgentOrchestrator:
         else:
             decision = PermissionDecision.DENY
 
-        # ----------------------------------------
-        # DENY
-        # ----------------------------------------
-
         if decision == PermissionDecision.DENY:
-            return "Action blocked by the JARVIS security policy."
-
-        # ----------------------------------------
-        # CONFIRM
-        # ----------------------------------------
+            return (
+                "Action blocked by the JARVIS "
+                "security policy."
+            )
 
         if decision == PermissionDecision.CONFIRM:
+
             description = self._describe_tool_action(
                 tool.name,
                 arguments,
@@ -145,22 +178,25 @@ class AgentOrchestrator:
             )
 
             if not approved:
-                return "The user denied the requested action."
-
-        # ----------------------------------------
-        # EXECUTE
-        # ----------------------------------------
+                return (
+                    "The user denied the requested action."
+                )
 
         try:
-            result = await tool.execute(arguments)
+            result = await tool.execute(
+                arguments
+            )
 
-        except Exception as exc:  # noqa: BLE001 - tool boundary: never crash the agent
+        except Exception as exc:  # noqa: BLE001
             return f"Tool execution failed: {exc}"
 
         if result.success:
             return result.output
 
-        return f"Tool execution failed: {result.error or 'Unknown error'}"
+        return (
+            "Tool execution failed: "
+            f"{result.error or 'Unknown error'}"
+        )
 
     @staticmethod
     def _describe_tool_action(
@@ -169,18 +205,30 @@ class AgentOrchestrator:
     ) -> str:
 
         if tool_name == "terminal":
+
             command = arguments.get(
                 "command",
                 "",
             )
 
-            working_directory = arguments.get("working_directory")
+            working_directory = arguments.get(
+                "working_directory"
+            )
 
-            description = f"Execute terminal command:\n  {command}"
+            description = (
+                "Execute terminal command:\n"
+                f"  {command}"
+            )
 
             if working_directory:
-                description += f"\nWorking directory:\n  {working_directory}"
+                description += (
+                    "\nWorking directory:\n"
+                    f"  {working_directory}"
+                )
 
             return description
 
-        return f"Execute tool '{tool_name}' with arguments:\n{arguments}"
+        return (
+            f"Execute tool '{tool_name}' "
+            f"with arguments:\n{arguments}"
+        )
