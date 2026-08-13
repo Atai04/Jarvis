@@ -2,16 +2,16 @@
 
 ## Phase 1 — Core
 
-- [ ] Configuration
-- [ ] LLM provider interface
-- [ ] OpenAI provider
-- [ ] Agent orchestrator
-- [ ] Tool registry
-- [ ] Safe tool system
-- [ ] Terminal interface
+- [x] Configuration
+- [x] LLM provider interface
+- [x] OpenAI provider
+- [x] Agent orchestrator
+- [x] Tool registry
+- [x] Safe tool system
+- [x] Terminal interface (with risk analyzer)
 - [ ] Logging
-- [ ] Error handling
-- [ ] Tests
+- [x] Error handling
+- [x] Tests (risk analyzer)
 
 ## Phase 2 — Tools
 
