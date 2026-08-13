@@ -15,20 +15,22 @@
 
 ## Phase 2 — Tools
 
-- [ ] Filesystem
-- [ ] Terminal
-- [ ] macOS
+- [ ] Filesystem (write/delete — currently read-only: list, read)
+- [x] Terminal
+- [x] macOS (open_application)
 - [ ] Browser
 - [ ] Web
-- [ ] GitHub
+- [x] GitHub (read: list_repositories, inspect_repository)
+- [ ] GitHub (write: create_commit, create_branch, list_issues, inspect_pull_request)
 
 ## Phase 3 — Memory
 
-- [ ] SQLite
-- [ ] Conversation memory
-- [ ] Long-term memory
-- [ ] Memory retrieval
-- [ ] Memory management
+- [x] SQLite
+- [ ] Conversation memory retrieval (saved, not yet retrieved by agent)
+- [x] Long-term memory (preferences: remember_preference, get_preference)
+- [ ] Project memory tools (remember_project, get_project)
+- [ ] Memory retrieval strategy
+- [ ] Memory management (inspect/delete/disable memory)
 
 ## Phase 4 — Voice
 
