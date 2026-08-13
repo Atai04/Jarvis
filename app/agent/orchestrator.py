@@ -2,6 +2,7 @@ import json
 from typing import Any
 
 from app.llm.base import LLMProvider
+from app.logging.logger import logger
 from app.security.permissions import (
     PermissionDecision,
     PermissionEngine,
@@ -66,7 +67,6 @@ TOOL SELECTION RULES:
 
 
 class AgentOrchestrator:
-
     def __init__(
         self,
         llm: LLMProvider,
@@ -81,6 +81,7 @@ class AgentOrchestrator:
         self,
         user_message: str,
     ) -> str:
+        request_id = logger.new_request_id()
 
         tool_schemas = self.tools.openai_schemas()
 
@@ -93,16 +94,15 @@ class AgentOrchestrator:
         max_iterations = 10
 
         for _ in range(max_iterations):
-
             if not response.tool_calls:
                 return response.content
 
             results: list[tuple[str, str]] = []
 
             for tool_call in response.tool_calls:
-
                 result = await self._handle_tool_call(
-                    tool_call
+                    tool_call,
+                    request_id,
                 )
 
                 results.append(
@@ -126,44 +126,44 @@ class AgentOrchestrator:
     async def _handle_tool_call(
         self,
         tool_call: Any,
+        request_id: str,
     ) -> str:
-
-        tool = self.tools.get(
-            tool_call.name
-        )
+        tool = self.tools.get(tool_call.name)
 
         if tool is None:
             return f"Unknown tool: {tool_call.name}"
 
         try:
-            arguments = json.loads(
-                tool_call.arguments
-            )
-
+            arguments = json.loads(tool_call.arguments)
         except json.JSONDecodeError as exc:
             return f"Invalid tool arguments: {exc}"
 
-        permission_level = tool.get_permission(
-            arguments
+        started = logger.tool_started(
+            request_id,
+            tool.name,
+            arguments,
         )
+
+        permission_level = tool.get_permission(arguments)
 
         if permission_level.value == "safe":
             decision = PermissionDecision.ALLOW
-
         elif permission_level.value == "confirm":
             decision = PermissionDecision.CONFIRM
-
         else:
             decision = PermissionDecision.DENY
 
         if decision == PermissionDecision.DENY:
-            return (
-                "Action blocked by the JARVIS "
-                "security policy."
+            logger.tool_finished(
+                request_id,
+                tool.name,
+                started,
+                False,
+                "Action blocked by the JARVIS security policy.",
             )
+            return "Action blocked by the JARVIS security policy."
 
         if decision == PermissionDecision.CONFIRM:
-
             description = self._describe_tool_action(
                 tool.name,
                 arguments,
@@ -178,41 +178,61 @@ class AgentOrchestrator:
             )
 
             if not approved:
-                return (
-                    "The user denied the requested action."
+                logger.tool_finished(
+                    request_id,
+                    tool.name,
+                    started,
+                    False,
+                    "The user denied the requested action.",
                 )
+                return "The user denied the requested action."
 
         try:
-            result = await tool.execute(
-                arguments
-            )
-
+            result = await tool.execute(arguments)
         except Exception as exc:  # noqa: BLE001
+            logger.tool_finished(
+                request_id,
+                tool.name,
+                started,
+                False,
+                str(exc),
+            )
             return f"Tool execution failed: {exc}"
 
         if result.success:
+            logger.tool_finished(
+                request_id,
+                tool.name,
+                started,
+                True,
+            )
             return result.output
 
-        return (
-            "Tool execution failed: "
-            f"{result.error or 'Unknown error'}"
+        error = result.error or "Unknown error"
+
+        logger.tool_finished(
+            request_id,
+            tool.name,
+            started,
+            False,
+            error,
         )
+
+        return f"Tool execution failed: {error}"
 
     @staticmethod
     def _describe_tool_action(
         tool_name: str,
         arguments: dict[str, Any],
     ) -> str:
-
         if tool_name == "terminal":
-
             command = arguments.get(
                 "command",
                 "",
             )
 
             working_directory = arguments.get(
-                "working_directory"
+                "working_directory",
             )
 
             description = (
