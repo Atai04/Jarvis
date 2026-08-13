@@ -1,8 +1,12 @@
 import asyncio
 
 from app.agent.orchestrator import AgentOrchestrator
-from app.config.settings import get_settings
+from app.config.settings import Settings, get_settings
+from app.github.client import GitHubClient
+from app.github.tools import InspectRepositoryTool, ListRepositoriesTool
 from app.llm.openai import OpenAIProvider
+from app.memory.database import Database
+from app.memory.repository import MemoryRepository
 from app.security.permissions import PermissionEngine
 from app.tools.filesystem import ListDirectoryTool, ReadFileTool
 from app.tools.macos import OpenApplicationTool
@@ -11,7 +15,7 @@ from app.tools.system import GetSystemInfoTool
 from app.tools.terminal import TerminalTool
 
 
-def build_tool_registry() -> ToolRegistry:
+def build_tool_registry(settings: Settings) -> ToolRegistry:
     registry = ToolRegistry()
 
     registry.register(OpenApplicationTool())
@@ -20,20 +24,34 @@ def build_tool_registry() -> ToolRegistry:
     registry.register(ReadFileTool())
     registry.register(TerminalTool())
 
+    github_client = GitHubClient(settings)
+
+    registry.register(ListRepositoriesTool(github_client))
+    registry.register(InspectRepositoryTool(github_client))
+
     return registry
+
+
+def build_memory() -> MemoryRepository:
+    database = Database()
+    database.initialize()
+
+    return MemoryRepository(database)
 
 
 async def main() -> None:
     settings = get_settings()
 
     provider = OpenAIProvider(settings)
-    tools = build_tool_registry()
+    tools = build_tool_registry(settings)
+    memory = build_memory()
     permissions = PermissionEngine()
 
     agent = AgentOrchestrator(
         llm=provider,
         tools=tools,
         permissions=permissions,
+        memory=memory,
     )
 
     print()
@@ -43,6 +61,8 @@ async def main() -> None:
     print("JARVIS is online.")
     print(f"Tools loaded: {len(tools.all())}")
     print("Permission system: ONLINE")
+    print("Memory system: ONLINE")
+    print("GitHub tools: ONLINE")
     print("Type 'exit' to quit.")
     print()
 
