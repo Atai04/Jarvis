@@ -3,6 +3,7 @@ from typing import Any
 
 from app.llm.base import LLMProvider
 from app.logging.logger import logger
+from app.memory.repository import MemoryRepository
 from app.security.permissions import (
     PermissionDecision,
     PermissionEngine,
@@ -72,10 +73,12 @@ class AgentOrchestrator:
         llm: LLMProvider,
         tools: ToolRegistry,
         permissions: PermissionEngine,
+        memory: MemoryRepository,
     ):
         self.llm = llm
         self.tools = tools
         self.permissions = permissions
+        self.memory = memory
 
     async def run(
         self,
@@ -83,11 +86,25 @@ class AgentOrchestrator:
     ) -> str:
         request_id = logger.new_request_id()
 
+        self.memory.save_conversation(
+            request_id,
+            "user",
+            user_message,
+        )
+
+        previous_conversations = self.memory.get_conversations(
+            request_id,
+        )
+
+        context = self._build_memory_context(
+            previous_conversations,
+        )
+
         tool_schemas = self.tools.openai_schemas()
 
         response = await self.llm.generate(
             system_prompt=SYSTEM_PROMPT,
-            user_message=user_message,
+            user_message=context,
             tools=tool_schemas,
         )
 
@@ -95,6 +112,12 @@ class AgentOrchestrator:
 
         for _ in range(max_iterations):
             if not response.tool_calls:
+                self.memory.save_conversation(
+                    request_id,
+                    "assistant",
+                    response.content,
+                )
+
                 return response.content
 
             results: list[tuple[str, str]] = []
@@ -118,10 +141,48 @@ class AgentOrchestrator:
                 tools=tool_schemas,
             )
 
-        return (
+        final_response = (
             "JARVIS stopped because the maximum "
             "agent iteration limit was reached."
         )
+
+        self.memory.save_conversation(
+            request_id,
+            "assistant",
+            final_response,
+        )
+
+        return final_response
+
+    @staticmethod
+    def _build_memory_context(
+        conversations: list[dict[str, object]],
+    ) -> str:
+        if not conversations:
+            return ""
+
+        lines = [
+            "Previous conversation context:",
+            "",
+        ]
+
+        for conversation in conversations[:-1]:
+            role = str(conversation["role"])
+            content = str(conversation["content"])
+
+            lines.append(
+                f"{role.upper()}: {content}"
+            )
+
+        lines.extend(
+            [
+                "",
+                "Current user message:",
+                str(conversations[-1]["content"]),
+            ]
+        )
+
+        return "\n".join(lines)
 
     async def _handle_tool_call(
         self,
@@ -161,6 +222,7 @@ class AgentOrchestrator:
                 False,
                 "Action blocked by the JARVIS security policy.",
             )
+
             return "Action blocked by the JARVIS security policy."
 
         if decision == PermissionDecision.CONFIRM:
@@ -185,6 +247,7 @@ class AgentOrchestrator:
                     False,
                     "The user denied the requested action.",
                 )
+
                 return "The user denied the requested action."
 
         try:
@@ -197,6 +260,7 @@ class AgentOrchestrator:
                 False,
                 str(exc),
             )
+
             return f"Tool execution failed: {exc}"
 
         if result.success:
@@ -206,6 +270,7 @@ class AgentOrchestrator:
                 started,
                 True,
             )
+
             return result.output
 
         error = result.error or "Unknown error"

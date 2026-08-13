@@ -12,30 +12,22 @@ from app.tools.terminal import TerminalTool
 
 
 def build_tool_registry() -> ToolRegistry:
-
     registry = ToolRegistry()
 
     registry.register(OpenApplicationTool())
-
     registry.register(GetSystemInfoTool())
-
     registry.register(ListDirectoryTool())
-
     registry.register(ReadFileTool())
-
     registry.register(TerminalTool())
 
     return registry
 
 
-async def main():
-
+async def main() -> None:
     settings = get_settings()
 
     provider = OpenAIProvider(settings)
-
     tools = build_tool_registry()
-
     permissions = PermissionEngine()
 
     agent = AgentOrchestrator(
@@ -66,7 +58,6 @@ async def main():
                 "quit",
             }:
                 print("JARVIS > Goodbye.")
-
                 break
 
             response = await agent.run(user_input)
@@ -77,10 +68,9 @@ async def main():
 
         except KeyboardInterrupt:
             print("\nJARVIS > Goodbye.")
-
             break
 
-        except Exception as exc:  # noqa: BLE001 - top-level REPL guard: never crash JARVIS
+        except Exception as exc:  # noqa: BLE001 - top-level REPL guard
             print(f"\nJARVIS ERROR > {exc}\n")
 
 
