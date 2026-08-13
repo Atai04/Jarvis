@@ -3,7 +3,12 @@ import logging
 import time
 import uuid
 from datetime import UTC, datetime
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any
+
+LOG_DIR = Path("logs")
+LOG_FILE = LOG_DIR / "jarvis.log"
 
 
 class StructuredLogger:
@@ -11,9 +16,22 @@ class StructuredLogger:
         self.logger = logging.getLogger(name)
 
         if not self.logger.handlers:
-            handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter("%(message)s"))
-            self.logger.addHandler(handler)
+            formatter = logging.Formatter("%(message)s")
+
+            stream_handler = logging.StreamHandler()
+            stream_handler.setFormatter(formatter)
+            self.logger.addHandler(stream_handler)
+
+            LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+            file_handler = RotatingFileHandler(
+                LOG_FILE,
+                maxBytes=5 * 1024 * 1024,
+                backupCount=3,
+                encoding="utf-8",
+            )
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
 
         self.logger.setLevel(logging.INFO)
         self.logger.propagate = False
@@ -45,10 +63,7 @@ class StructuredLogger:
                 return "[REDACTED]"
 
             if isinstance(value, dict):
-                return {
-                    str(k): sanitize(v, str(k))
-                    for k, v in value.items()
-                }
+                return {str(k): sanitize(v, str(k)) for k, v in value.items()}
 
             if isinstance(value, list):
                 return [sanitize(item) for item in value]
