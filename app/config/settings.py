@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     llm_provider: str = "openai"
     openai_api_key: str = ""
     openai_model: str = "gpt-5.2"
+    github_token: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",
