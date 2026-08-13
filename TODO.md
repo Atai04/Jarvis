@@ -9,7 +9,7 @@
 - [x] Tool registry
 - [x] Safe tool system
 - [x] Terminal interface (with risk analyzer)
-- [ ] Logging
+- [x] Logging
 - [x] Error handling
 - [x] Tests (risk analyzer)
 
