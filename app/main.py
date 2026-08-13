@@ -7,7 +7,12 @@ from app.github.tools import InspectRepositoryTool, ListRepositoriesTool
 from app.llm.openai import OpenAIProvider
 from app.memory.database import Database
 from app.memory.repository import MemoryRepository
-from app.memory.tools import GetPreferenceTool, RememberPreferenceTool
+from app.memory.tools import (
+    GetPreferenceTool,
+    GetProjectTool,
+    RememberPreferenceTool,
+    RememberProjectTool,
+)
 from app.security.permissions import PermissionEngine
 from app.tools.filesystem import ListDirectoryTool, ReadFileTool
 from app.tools.macos import OpenApplicationTool
@@ -35,6 +40,8 @@ def build_tool_registry(
 
     registry.register(RememberPreferenceTool(memory))
     registry.register(GetPreferenceTool(memory))
+    registry.register(RememberProjectTool(memory))
+    registry.register(GetProjectTool(memory))
 
     return registry
 
