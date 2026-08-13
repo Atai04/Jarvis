@@ -32,10 +32,12 @@ logging are working end-to-end and manually verified.
 - [x] Manual end-to-end verification of all tools + permission flows via REPL
 - [x] Structured logging (tool execution logs, request IDs, timestamps,
   sanitized arguments, result status, and execution duration)
+- [x] Memory system (SQLite: conversations, projects, preferences)
+- [x] Memory repository tests (52 tests passing)
 
 ## In Progress / Not Started
 
-- [ ] Memory system (SQLite: conversations, projects, preferences)
+- [x] Memory system (SQLite: conversations, projects, preferences)
 - [ ] GitHub tools (list_repositories, inspect_repository, create_commit, etc.)
 - [ ] Browser tools (open_url, search_web)
 - [ ] Basic CLI polish (currently a simple input loop in app/main.py)
@@ -50,8 +52,7 @@ logging are working end-to-end and manually verified.
 
 ## Next Task
 
-Implement the Memory system using SQLite for conversations, projects,
-and preferences.
+Implement GitHub tools for repository inspection and GitHub operations.
 
 ## Important Rules
 
