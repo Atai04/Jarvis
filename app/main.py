@@ -7,6 +7,7 @@ from app.github.tools import InspectRepositoryTool, ListRepositoriesTool
 from app.llm.openai import OpenAIProvider
 from app.memory.database import Database
 from app.memory.repository import MemoryRepository
+from app.memory.tools import GetPreferenceTool, RememberPreferenceTool
 from app.security.permissions import PermissionEngine
 from app.tools.filesystem import ListDirectoryTool, ReadFileTool
 from app.tools.macos import OpenApplicationTool
@@ -15,7 +16,10 @@ from app.tools.system import GetSystemInfoTool
 from app.tools.terminal import TerminalTool
 
 
-def build_tool_registry(settings: Settings) -> ToolRegistry:
+def build_tool_registry(
+    settings: Settings,
+    memory: MemoryRepository,
+) -> ToolRegistry:
     registry = ToolRegistry()
 
     registry.register(OpenApplicationTool())
@@ -28,6 +32,9 @@ def build_tool_registry(settings: Settings) -> ToolRegistry:
 
     registry.register(ListRepositoriesTool(github_client))
     registry.register(InspectRepositoryTool(github_client))
+
+    registry.register(RememberPreferenceTool(memory))
+    registry.register(GetPreferenceTool(memory))
 
     return registry
 
@@ -43,8 +50,8 @@ async def main() -> None:
     settings = get_settings()
 
     provider = OpenAIProvider(settings)
-    tools = build_tool_registry(settings)
     memory = build_memory()
+    tools = build_tool_registry(settings, memory)
     permissions = PermissionEngine()
 
     agent = AgentOrchestrator(

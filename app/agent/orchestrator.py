@@ -40,29 +40,45 @@ IMPORTANT RULES:
 
 10. Keep responses concise and useful.
 
+MEMORY RULES:
+
+11. You have persistent memory stored by JARVIS.
+
+12. When the user explicitly asks you to remember, save, or keep a
+    personal preference or fact, store it using the memory system.
+
+13. When answering a question about something the user previously asked
+    JARVIS to remember, use the persistent memory context provided to you.
+
+14. Never claim that something was remembered unless it was actually
+    stored successfully.
+
+15. If persistent memory does not contain the requested information,
+    say that you do not have that information.
+
 TOOL SELECTION RULES:
 
-11. Use the most specific available tool for the user's request.
+16. Use the most specific available tool for the user's request.
 
-12. If the user asks to read a specific local file and the read_file tool
+17. If the user asks to read a specific local file and the read_file tool
     is available, use read_file directly.
 
-13. Do not use terminal commands such as cat, find, grep, mdfind, or similar
+18. Do not use terminal commands such as cat, find, grep, mdfind, or similar
     commands as a substitute for read_file when read_file is available.
 
-14. If the user asks to list the contents of a directory and the
+19. If the user asks to list the contents of a directory and the
     list_directory tool is available, use list_directory directly.
 
-15. If the user asks for information about the Mac itself and the
+20. If the user asks for information about the Mac itself and the
     get_system_info tool is available, use get_system_info directly.
 
-16. Use the terminal tool when the user explicitly asks to execute a
+21. Use the terminal tool when the user explicitly asks to execute a
     terminal command, or when no more specific tool is available.
 
-17. Do not use a more powerful tool when a narrower tool can safely
+22. Do not use a more powerful tool when a narrower tool can safely
     accomplish the same task.
 
-18. For multi-step requests, complete each required step using the
+23. For multi-step requests, complete each required step using the
     appropriate tool before producing the final answer.
 """
 
@@ -74,7 +90,7 @@ class AgentOrchestrator:
         tools: ToolRegistry,
         permissions: PermissionEngine,
         memory: MemoryRepository,
-    ):
+    ) -> None:
         self.llm = llm
         self.tools = tools
         self.permissions = permissions
@@ -96,15 +112,26 @@ class AgentOrchestrator:
             request_id,
         )
 
-        context = self._build_memory_context(
+        memory_context = self._build_memory_context()
+
+        conversation_context = self._build_conversation_context(
             previous_conversations,
+        )
+
+        user_context = "\n\n".join(
+            part
+            for part in (
+                memory_context,
+                conversation_context,
+            )
+            if part
         )
 
         tool_schemas = self.tools.openai_schemas()
 
         response = await self.llm.generate(
             system_prompt=SYSTEM_PROMPT,
-            user_message=context,
+            user_message=user_context,
             tools=tool_schemas,
         )
 
@@ -112,13 +139,20 @@ class AgentOrchestrator:
 
         for _ in range(max_iterations):
             if not response.tool_calls:
+                final_response = response.content
+
+                self._process_memory_request(
+                    user_message,
+                    final_response,
+                )
+
                 self.memory.save_conversation(
                     request_id,
                     "assistant",
-                    response.content,
+                    final_response,
                 )
 
-                return response.content
+                return final_response
 
             results: list[tuple[str, str]] = []
 
@@ -154,15 +188,158 @@ class AgentOrchestrator:
 
         return final_response
 
+    def _build_memory_context(self) -> str:
+        preferences = self._get_preferences()
+
+        if not preferences:
+            return ""
+
+        lines = [
+            "Persistent user memory:",
+            "",
+        ]
+
+        for key, value in preferences.items():
+            lines.append(
+                f"- {key}: {value}"
+            )
+
+        return "\n".join(lines)
+
+    def _get_preferences(self) -> dict[str, str]:
+        preferences: dict[str, str] = {}
+
+        known_keys = (
+            "favorite_project",
+            "favorite_language",
+            "preferred_name",
+            "preferred_editor",
+            "communication_style",
+        )
+
+        for key in known_keys:
+            value = self.memory.get_preference(key)
+
+            if value is not None:
+                preferences[key] = value
+
+        return preferences
+
+    def _process_memory_request(
+        self,
+        user_message: str,
+        assistant_response: str,
+    ) -> None:
+        message = user_message.strip().lower()
+
+        if not self._is_memory_request(message):
+            return
+
+        preference = self._extract_preference(user_message)
+
+        if preference is None:
+            return
+
+        key, value = preference
+
+        existing = self.memory.get_preference(key)
+
+        if existing is None:
+            self.memory.save_preference(
+                key,
+                value,
+            )
+        else:
+            self.memory.update_preference(
+                key,
+                value,
+            )
+
     @staticmethod
-    def _build_memory_context(
+    def _is_memory_request(message: str) -> bool:
+        memory_phrases = (
+            "remember that",
+            "remember this",
+            "remember my",
+            "don't forget that",
+            "do not forget that",
+            "save this",
+            "keep this in mind",
+        )
+
+        return any(
+            phrase in message
+            for phrase in memory_phrases
+        )
+
+    @staticmethod
+    def _extract_preference(
+        message: str,
+    ) -> tuple[str, str] | None:
+        normalized = message.strip()
+
+        lower = normalized.lower()
+
+        prefix = "remember that "
+
+        if lower.startswith(prefix):
+            statement = normalized[len(prefix):].strip()
+        else:
+            prefix = "remember my "
+
+            if not lower.startswith(prefix):
+                return None
+
+            statement = normalized[len(prefix):].strip()
+
+        statement = statement.rstrip(".!?").strip()
+
+        if not statement:
+            return None
+
+        lower_statement = statement.lower()
+
+        if lower_statement.startswith("favorite project is "):
+            value = statement[len("favorite project is "):].strip()
+
+            if value:
+                return "favorite_project", value
+
+        if lower_statement.startswith("favorite project:"):
+            value = statement.split(":", 1)[1].strip()
+
+            if value:
+                return "favorite_project", value
+
+        if lower_statement.startswith("favorite language is "):
+            value = statement[len("favorite language is "):].strip()
+
+            if value:
+                return "favorite_language", value
+
+        if lower_statement.startswith("preferred editor is "):
+            value = statement[len("preferred editor is "):].strip()
+
+            if value:
+                return "preferred_editor", value
+
+        if lower_statement.startswith("preferred name is "):
+            value = statement[len("preferred name is "):].strip()
+
+            if value:
+                return "preferred_name", value
+
+        return None
+
+    @staticmethod
+    def _build_conversation_context(
         conversations: list[dict[str, object]],
     ) -> str:
         if not conversations:
             return ""
 
         lines = [
-            "Previous conversation context:",
+            "Current conversation context:",
             "",
         ]
 
