@@ -1,6 +1,7 @@
 import asyncio
 
 from app.agent.orchestrator import AgentOrchestrator
+from app.browser.tools import OpenURLTool
 from app.config.settings import Settings, get_settings
 from app.github.client import GitHubClient
 from app.github.tools import InspectRepositoryTool, ListRepositoriesTool
@@ -43,6 +44,8 @@ def build_tool_registry(
     registry.register(RememberProjectTool(memory))
     registry.register(GetProjectTool(memory))
 
+    registry.register(OpenURLTool())
+
     return registry
 
 
@@ -77,6 +80,7 @@ async def main() -> None:
     print("Permission system: ONLINE")
     print("Memory system: ONLINE")
     print("GitHub tools: ONLINE")
+    print("Browser tools: ONLINE")
     print("Type 'exit' to quit.")
     print()
 
