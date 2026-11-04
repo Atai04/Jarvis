@@ -22,6 +22,7 @@ from app.tools.system import GetSystemInfoTool
 from app.tools.terminal import TerminalTool
 from app.voice.cli import record_command, speak_command, transcribe_command
 from app.voice.conversation import VoiceConversation
+from app.voice.wake import WakeSession
 
 
 def build_tool_registry(
@@ -73,6 +74,7 @@ async def main() -> None:
         memory=memory,
     )
     voice = VoiceConversation(settings, agent)
+    wake = WakeSession(settings, voice)
 
     print()
     print("================================")
@@ -115,6 +117,10 @@ async def main() -> None:
 
             if user_input == "/voice":
                 await voice.run()
+                continue
+
+            if user_input == "/wake":
+                await wake.run()
                 continue
 
             response = await agent.run(user_input)

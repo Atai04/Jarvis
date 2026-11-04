@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     web_search_enabled: bool = False
     web_search_max_requests_per_turn: int = Field(default=1, ge=0)
     github_token: str = ""
+    voice_wake_enabled: bool = False
+    voice_wake_phrase: Literal["Hey Jarvis"] = "Hey Jarvis"
+    voice_wake_timeout_seconds: float = Field(default=30, ge=1, le=120)
     voice_recording_enabled: bool = False
     voice_sample_rate: int = Field(default=16000, ge=8000, le=192000)
     voice_max_duration_seconds: float = Field(default=30, ge=0.1, le=300)

@@ -215,6 +215,11 @@ dependencies = [
     { name = "sounddevice" },
 ]
 
+[package.optional-dependencies]
+wake = [
+    { name = "pocketsphinx" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
@@ -226,11 +231,13 @@ dev = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "openai", specifier = ">=3.0.0" },
+    { name = "pocketsphinx", marker = "extra == 'wake'", specifier = "==5.1.1" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "sounddevice", specifier = ">=0.5.3,<0.6" },
 ]
+provides-extras = ["wake"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -311,6 +318,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
 ]
+
+[[package]]
+name = "pocketsphinx"
+version = "5.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "sounddevice" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/61/e7/13e0e787ff467218de880310d79cba14424f13b87171ac44af0bde1e428c/pocketsphinx-5.1.1.tar.gz", hash = "sha256:675778b309a22dfc9b7d37f7621976bba491d2a5f8c59696bd77fd6d07271355", size = 34158862, upload-time = "2026-06-06T17:33:13.04Z" }
 
 [[package]]
 name = "pycparser"

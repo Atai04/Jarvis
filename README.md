@@ -711,3 +711,98 @@ single diagnostic reports OpenAI with no fallback. Automated regression tests us
 mocked audio/API operations and real pseudo-terminal queues; no billable calls were
 made to develop this fix. Your previously successful live conversation test is
 separate from verification of these terminal changes.
+
+### Optional local wake phrase (`/wake`)
+
+`/wake` starts **one** opt-in, local listening session for **Hey Jarvis**. It is
+experimental keyword spotting, not speaker authentication. No listening starts
+at application startup. `/voice` continues to work as before.
+
+The detector is [PocketSphinx 5.1.1](https://pypi.org/project/pocketsphinx/5.1.1/),
+using its bundled US English acoustic model and dictionary in keyphrase mode.
+Both `hey` and `jarvis` are in that dictionary; no dedicated neural wake model or
+separate model download is needed. We retain PocketSphinx's built-in
+`kws_threshold=1e-30`, rather than inventing a threshold. Only the exact configured
+phrase `Hey Jarvis` is supported. Accent, distance, noise and similar-sounding
+speech can cause missed detections or false activations. The user has confirmed
+successful manual operation on their MacBook; accuracy across other speakers and
+environments has not been benchmarked.
+
+Compatibility was checked locally on **Python 3.14.1, macOS arm64**: the official
+5.1.1 source distribution built successfully, loaded the bundled model and phrase
+vocabulary, and rejected synthetic silence. PyPI currently provides macOS wheels
+for Python 3.11/3.13, not 3.14, so installation on this stack requires a native build
+and Apple command-line development tools. This is not a claim of a published
+Python 3.14 wheel or a guarantee for all macOS versions.
+
+[openWakeWord](https://github.com/dscripka/openWakeWord) was also evaluated. It has
+a Hey Jarvis model, but an [open upstream report](https://github.com/dscripka/openWakeWord/issues/336)
+describes near-zero ONNX scores on Apple Silicon. That report was not reproduced
+here. Although ONNX Runtime 1.31.1 has a Python 3.14 macOS arm64 wheel, that alone
+does not verify wake accuracy. openWakeWord's pretrained models also carry
+CC BY-NC-SA 4.0 restrictions. No openWakeWord dependency or model was installed.
+
+Install the optional detector from the locked dependency metadata:
+
+```sh
+# If Apple command-line development tools are missing:
+xcode-select --install
+uv sync --extra wake
+
+VOICE_WAKE_ENABLED=true VOICE_WAKE_TIMEOUT_SECONDS=30 \
+VOICE_RECORDING_ENABLED=true VOICE_TRANSCRIPTION_ENABLED=true \
+VOICE_TTS_ENABLED=true VOICE_TTS_PROVIDER=openai \
+VOICE_OPENAI_TTS_VOICE=cedar VOICE_TTS_FALLBACK_TO_MACOS=false \
+uv run --extra wake python -m app.main
+```
+
+Keep using your existing credentials; no new credential is needed. These commands
+do not change `.env`. Defaults: `VOICE_WAKE_ENABLED=false`,
+`VOICE_WAKE_PHRASE="Hey Jarvis"`, timeout 30 seconds (allowed range 1–120).
+A missing optional package or unusable model fails before microphone access.
+Existing `/voice` configuration must be enabled before wake listening can start.
+
+At `You >`, enter `/wake`. Wait for `Listening locally — microphone active`,
+then say “Hey Jarvis.” **Pause until `Recording` appears**, then
+say your command and press Enter as with `/voice`. Wake capture closes before a
+fresh command recording starts; words spoken during this gap are lost. A match
+starts exactly one voice interaction, then returns to idle. Timeout returns to
+idle without a cloud call. Ctrl-C cancels and follows the CLI's existing shutdown
+behavior; it never restarts listening automatically.
+
+Wake PCM is never written to disk, logged, stored in SQLite, or passed to STT.
+The callback queue holds at most eight 64 ms mono 16 kHz/int16 frames (16 KiB),
+plus bounded model/session state and the current frame. Overflow fails the session.
+The session limit bounds capture and decoder history; inference and native device
+operations run in a worker thread. Actual CPU/RSS has not been benchmarked. Each
+activation loads a fresh detector, so initial startup may take a moment. Python
+releases buffers on cleanup but does not guarantee forensic memory zeroization.
+
+Only **after detection**, the existing voice workflow records and uploads a new
+command, invokes the agent and uses configured TTS (including OpenAI Cedar).
+Those existing API calls can incur charges. A false wake can therefore start
+billable command capture; leave wake disabled when not deliberately testing it.
+Wake detection cannot approve tools: queued keyboard input is flushed, and
+sensitive tools still require a fresh typed answer at the permission prompt.
+Keyboard echo is suppressed only while waiting for activation; existing `/voice`
+terminal ownership resumes at handoff. The terminal limitations documented above
+also apply. Cancellation waits for worker cleanup; a stuck native library call
+cannot be forcibly killed safely from Python. Ctrl-C cannot undo completed actions
+or API charges.
+
+PocketSphinx's [license](https://github.com/cmusphinx/pocketsphinx/blob/v5.1.1/LICENSE)
+is BSD-style with attribution/notice requirements and additional third-party
+notices. The bundled acoustic model's
+[README](https://github.com/cmusphinx/pocketsphinx/blob/v5.1.1/model/en-us/en-us/README)
+contains Alpha Cephei's two-clause redistribution terms; preserve those notices
+if redistributing dependencies/models. No model binaries are vendored here.
+
+Manual regression checks (a successful activation uses the existing billable
+voice pipeline): verify disabled `/wake` does not capture; enable it and try
+silence/unrelated speech until timeout; try the phrase then wait for `Recording`
+and give one benign command. Confirm one response and no automatic re-listening.
+Test a typed tool denial, then Ctrl-C during listening and during playback. Verify
+terminal echo returns and `/voice` can record again after restarting. Test missing
+microphone permission through macOS System Settings > Privacy & Security >
+Microphone for your terminal/IDE. Automated tests use mocked devices/inference and
+pseudo-terminals; no microphone access or billable requests are needed.
