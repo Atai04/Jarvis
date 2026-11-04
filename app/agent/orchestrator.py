@@ -128,18 +128,25 @@ class AgentOrchestrator:
         )
 
         tool_schemas = self.tools.openai_schemas()
+        logger.model_context(
+            request_id, memory_chars=len(memory_context),
+            conversation_chars=len(conversation_context),
+            user_message_chars=len(user_message),
+        )
 
         response = await self.llm.generate(
             system_prompt=SYSTEM_PROMPT,
             user_message=user_context,
             tools=tool_schemas,
         )
+        logger.model_usage(request_id, response.usage)
+        logger.model_diagnostics(request_id, response)
 
         max_iterations = 10
 
         for _ in range(max_iterations):
             if not response.tool_calls:
-                final_response = response.content
+                final_response = response.display_text()
 
                 self._process_memory_request(
                     user_message,
@@ -174,6 +181,8 @@ class AgentOrchestrator:
                 results=results,
                 tools=tool_schemas,
             )
+            logger.model_usage(request_id, response.usage)
+            logger.model_diagnostics(request_id, response)
 
         final_response = (
             "JARVIS stopped because the maximum "
@@ -337,6 +346,9 @@ class AgentOrchestrator:
     ) -> str:
         if not conversations:
             return ""
+
+        if len(conversations) == 1:
+            return str(conversations[0]["content"])
 
         lines = [
             "Current conversation context:",

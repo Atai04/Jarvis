@@ -20,6 +20,8 @@ from app.tools.macos import OpenApplicationTool
 from app.tools.registry import ToolRegistry
 from app.tools.system import GetSystemInfoTool
 from app.tools.terminal import TerminalTool
+from app.voice.cli import record_command, speak_command, transcribe_command
+from app.voice.conversation import VoiceConversation
 
 
 def build_tool_registry(
@@ -70,6 +72,7 @@ async def main() -> None:
         permissions=permissions,
         memory=memory,
     )
+    voice = VoiceConversation(settings, agent)
 
     print()
     print("================================")
@@ -98,13 +101,29 @@ async def main() -> None:
                 print("JARVIS > Goodbye.")
                 break
 
+            if user_input == "/record":
+                record_command(settings)
+                continue
+
+            if user_input == "/transcribe":
+                await transcribe_command(settings)
+                continue
+
+            if user_input == "/speak":
+                await speak_command(settings)
+                continue
+
+            if user_input == "/voice":
+                await voice.run()
+                continue
+
             response = await agent.run(user_input)
 
             print()
             print(f"JARVIS > {response}")
             print()
 
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, EOFError, asyncio.CancelledError):
             print("\nJARVIS > Goodbye.")
             break
 

@@ -14,3 +14,34 @@ logs/*
 
 *.sqlite3
 *.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Local recordings, generated speech, private logs and credential files
+recordings/
+audio/
+tmp/
+temp/
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.aiff
+*.aif
+*.flac
+*.opus
+*.ogg
+*.pcm
+*.log
+*.log.*
+*.pem
+*.key
+.aws/
+.cache/
+credentials.json
+secrets.json

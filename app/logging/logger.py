@@ -7,6 +7,9 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
+from app.llm.base import LLMResponse, TokenUsage
+from app.voice.privacy import private_audio_request
+
 LOG_DIR = Path("logs")
 LOG_FILE = LOG_DIR / "jarvis.log"
 
@@ -75,6 +78,51 @@ class StructuredLogger:
 
         return sanitize(arguments)
 
+    def model_usage(self, request_id: str, usage: TokenUsage | None) -> None:
+        """Log only allowlisted counters, never prompts or raw API responses."""
+        self._write(
+            event="model_usage",
+            request_id=request_id,
+            input_tokens=usage.input_tokens if usage is not None else None,
+            output_tokens=usage.output_tokens if usage is not None else None,
+            total_tokens=usage.total_tokens if usage is not None else None,
+        )
+
+    def model_context(
+        self,
+        request_id: str,
+        *,
+        memory_chars: int,
+        conversation_chars: int,
+        user_message_chars: int,
+    ) -> None:
+        self._write(
+            event="model_context",
+            request_id=request_id,
+            memory_chars=memory_chars,
+            conversation_chars=conversation_chars,
+            user_message_chars=user_message_chars,
+        )
+
+    def model_diagnostics(self, request_id: str, response: LLMResponse) -> None:
+        """Explicit allowlist: never serialize raw responses, actions or queries."""
+        metrics = response.request_metrics
+        self._write(
+            event="model_diagnostics",
+            request_id=request_id,
+            web_search_occurred=response.web_search_call_count > 0,
+            web_search_call_count=response.web_search_call_count,
+            web_search_completed_count=response.web_search_completed_count,
+            web_search_offered=metrics.web_search_offered if metrics else None,
+            continuation=metrics.continuation if metrics else None,
+            instructions_chars=metrics.instructions_chars if metrics else None,
+            custom_tool_schema_json_chars=metrics.custom_tool_schema_json_chars
+            if metrics
+            else None,
+            custom_tool_count=metrics.custom_tool_count if metrics else None,
+            input_json_chars=metrics.input_json_chars if metrics else None,
+        )
+
     def tool_started(
         self,
         request_id: str,
@@ -118,7 +166,24 @@ class StructuredLogger:
 
         self._write(**data)
 
+    def speech_playback(
+        self, *, selected_provider: str, playback_provider: str | None,
+        fallback_occurred: bool, outcome: str,
+    ) -> None:
+        self._write(
+            event="speech_playback", selected_provider=selected_provider,
+            playback_provider=playback_provider, fallback_occurred=fallback_occurred,
+            outcome=outcome,
+        )
+
     def _write(self, **data: Any) -> None:
+        if private_audio_request.get():
+            # Voice turns can put the transcript in tool arguments or errors.
+            # Keep operational counters/status, not free-form content.
+            data = {
+                key: value for key, value in data.items()
+                if key not in {"arguments", "error"}
+            }
         payload = {
             "timestamp": datetime.now(UTC).isoformat(),
             **data,

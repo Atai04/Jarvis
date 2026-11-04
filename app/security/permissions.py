@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from app.utils.terminal_input import confirmation_input
+
 
 class PermissionDecision(str, Enum):
     ALLOW = "allow"
@@ -39,16 +41,17 @@ class PermissionEngine:
         request: PermissionRequest,
     ) -> bool:
 
-        print()
-        print("========================================")
-        print("        JARVIS PERMISSION REQUEST")
-        print("========================================")
-        print()
-        print(f"Tool:   {request.tool_name}")
-        print(f"Action: {request.description}")
-        print(f"Risk:   {request.risk_level}")
-        print()
+        with confirmation_input():
+            print()
+            print("========================================")
+            print("        JARVIS PERMISSION REQUEST")
+            print("========================================")
+            print()
+            print(f"Tool:   {request.tool_name}")
+            print(f"Action: {request.description}")
+            print(f"Risk:   {request.risk_level}")
+            print()
 
-        answer = input("Allow this action? [y/N]: ").strip().lower()
+            answer = input("Allow this action? [y/N]: ").strip().lower()
 
-        return answer in {"y", "yes"}
+            return answer in {"y", "yes"}
